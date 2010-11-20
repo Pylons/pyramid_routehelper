@@ -1,7 +1,8 @@
 Route Helpers for Pyramid
 =========================
 
-``pyramid_routehelper`` is a package of RPC related add-on'
+``pyramid_routehelper`` contains route and view handler helpers for the
+pyramid web framework.
 
 Support and Documentation
 -------------------------
