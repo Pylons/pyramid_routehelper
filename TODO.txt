@@ -1,0 +1,7 @@
+pyramid_routehelper TODO
+========================
+
+- Add RESTful helper
+- Add submapper style support
+- Add sub_domain option
+- Add converters
