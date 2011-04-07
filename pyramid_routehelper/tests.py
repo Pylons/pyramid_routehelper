@@ -17,33 +17,103 @@ class Test_add_resource(unittest.TestCase):
         self.config = self._create_config()
     
     def tearDown(self):
+        self.config.end()
         del self.config
     
     def test_basic_resources(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages')
+        self.config.begin()
+        
+        assert route_path('messages', testing.DummyRequest()) == '/messages'
+        assert route_path('formatted_messages', testing.DummyRequest(), format='html') == '/messages.html'
+        assert route_path('new_message', testing.DummyRequest()) == '/messages/new'
+        assert route_path('formatted_new_message', testing.DummyRequest(), format='html') == '/messages/new.html'
+        
+        assert route_path('formatted_message', testing.DummyRequest(), id=1, format='html') == '/messages/1.html'
+        assert route_path('message', testing.DummyRequest(), id=1) == '/messages/1'
+        assert route_path('formatted_edit_message', testing.DummyRequest(), id=1, format='html') == '/messages/1/edit.html'
+        assert route_path('edit_message', testing.DummyRequest(), id=1) == '/messages/1/edit'
     
     def test_resources_with_path_prefix(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', path_prefix='/category/:category_id')
+        self.config.begin()
+        
+        assert route_path('messages', testing.DummyRequest(), category_id=2) == '/category/2/messages'
+        assert route_path('formatted_messages', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages.html'
+        assert route_path('new_message', testing.DummyRequest(), category_id=2) == '/category/2/messages/new'
+        assert route_path('formatted_new_message', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages/new.html'
+        
+        assert route_path('formatted_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1.html'
+        assert route_path('message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1'
+        assert route_path('formatted_edit_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1/edit.html'
+        assert route_path('edit_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1/edit'
     
     def test_resources_with_path_prefix_with_trailing_slash(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', path_prefix='/category/:category_id/')
+        self.config.begin()
+        
+        assert route_path('messages', testing.DummyRequest(), category_id=2) == '/category/2/messages'
+        assert route_path('formatted_messages', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages.html'
+        assert route_path('new_message', testing.DummyRequest(), category_id=2) == '/category/2/messages/new'
+        assert route_path('formatted_new_message', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages/new.html'
+        
+        assert route_path('formatted_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1.html'
+        assert route_path('message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1'
+        assert route_path('formatted_edit_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1/edit.html'
+        assert route_path('edit_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1/edit'
     
     def test_resources_with_collection_action(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', collection=dict(sorted='GET'))
+        self.config.begin()
+        
+        assert route_path('sorted_messages', testing.DummyRequest()) == '/messages/sorted'
     
     def test_resources_with_member_action(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', member=dict(comment='GET'))
+        self.config.begin()
+        
+        assert route_path('comment_message', testing.DummyRequest(), id=1) == '/messages/1/comment'
     
     def test_resources_with_new_action(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', new=dict(preview='GET'))
+        self.config.begin()
+        
+        assert route_path('preview_new_message', testing.DummyRequest(), id=1) == '/messages/new/preview'
     
     def test_resources_with_name_prefix(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', name_prefix="special_")
+        self.config.begin()
+        
+        assert route_path('special_message', testing.DummyRequest(), id=1) == '/messages/1'
     
     def test_resources_with_parent_resource(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler',
                                  'message', 'messages',
                                  parent_resource = dict(member_name='category', collection_name='categories'))
+        self.config.begin()
+        
+        assert route_path('category_messages', testing.DummyRequest(), category_id=2) == '/categories/2/messages'
+        assert route_path('category_message', testing.DummyRequest(), category_id=2, id=1) == '/categories/2/messages/1'
+    
+    def test_resources_with_parent_resource_override_path_prefix(self):
+        self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler',
+                                 'message', 'messages',
+                                 parent_resource = dict(member_name='category', collection_name='categories'),
+                                 path_prefix = 'folders/:folder_id')
+        self.config.begin()
+        
+        assert route_path('category_messages', testing.DummyRequest(), folder_id=2) == '/folders/2/messages'
+        assert route_path('category_message', testing.DummyRequest(), folder_id=2, id=1) == '/folders/2/messages/1'
+    
+    def test_resources_with_parent_resource_override_name_prefix(self):
+        self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler',
+                                 'message', 'messages',
+                                 parent_resource = dict(member_name='category', collection_name='categories'),
+                                 name_prefix = '')
+        self.config.begin()
+        
+        assert route_path('messages', testing.DummyRequest(), category_id=2) == '/categories/2/messages'
+        assert route_path('message', testing.DummyRequest(), category_id=2, id=1) == '/categories/2/messages/1'
 
 class Test_includeme(unittest.TestCase):
     def test_includme(self):
