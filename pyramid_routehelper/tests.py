@@ -126,8 +126,8 @@ class DummyCrudHandler(object):
         return "create"
     
     @action(renderer='json')
-    def read(self):
-        return "read"
+    def show(self):
+        return "show"
     
     @action(renderer='json')
     def update(self):
