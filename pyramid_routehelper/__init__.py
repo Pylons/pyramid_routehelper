@@ -110,19 +110,19 @@ def add_resource(self, handler, member_name, collection_name, **kwargs):
 
         Example:: 
 
-            >>> from pyramid.url import resource_url
+            >>> from pyramid.url import route_path
             >>> config.add_resource('myproject.handlers:LocationHandler', 'location', 'locations', 
             ...            parent_resource=dict(member_name='region', 
             ...                                 collection_name='regions'))
             >>> # path_prefix is "regions/:region_id" 
             >>> # name prefix is "region_"  
-            >>> resource_url('region_locations', region_id=13) 
+            >>> route_path('region_locations', region_id=13) 
             '/regions/13/locations'
-            >>> resource_url('region_new_location', region_id=13) 
+            >>> route_path('region_new_location', region_id=13) 
             '/regions/13/locations/new'
-            >>> resource_url('region_location', region_id=13, id=60) 
+            >>> route_path('region_location', region_id=13, id=60) 
             '/regions/13/locations/60'
-            >>> resource_url('region_edit_location', region_id=13, id=60) 
+            >>> route_path('region_edit_location', region_id=13, id=60) 
             '/regions/13/locations/60/edit'
 
         Overriding generated ``path_prefix``::
@@ -132,18 +132,17 @@ def add_resource(self, handler, member_name, collection_name, **kwargs):
             ...                                 collection_name='regions'),
             ...            path_prefix='areas/:area_id')
             >>> # name prefix is "region_"
-            >>> url_for('region_locations', area_id=51)
+            >>> route_path('region_locations', area_id=51)
             '/areas/51/locations'
 
         Overriding generated ``name_prefix``::
 
-            >>> m = Mapper()
-            >>> m.resource('location', 'locations',
+            >>> config.add_resource('myproject.handlers:LocationHandler', 'location', 'locations', 
             ...            parent_resource=dict(member_name='region',
             ...                                 collection_name='regions'),
             ...            name_prefix='')
             >>> # path_prefix is "regions/:region_id" 
-            >>> url_for('locations', region_id=51)
+            >>> route_path('locations', region_id=51)
             '/regions/51/locations'
     """
     
