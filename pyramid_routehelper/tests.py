@@ -6,7 +6,7 @@ from pyramid_routehelper import includeme as routehelper_includeme, add_resource
 from pyramid.url import route_path
 
 
-class Test_add_resource(unittest.TestCase):
+class TestResourceGeneration_add_resource(unittest.TestCase):
     def _create_config(self, autocommit=True):
         config = Configurator(autocommit=autocommit)
         handlers_includeme(config)
