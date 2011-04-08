@@ -106,6 +106,77 @@ class TestResourceGeneration_add_resource(unittest.TestCase):
         assert route_path('messages', testing.DummyRequest(), category_id=2) == '/categories/2/messages'
         assert route_path('message', testing.DummyRequest(), category_id=2, id=1) == '/categories/2/messages/1'
 
+class TestResourceRecognition(unittest.TestCase):
+    def _create_config(self, autocommit=True):
+        config = Configurator(autocommit=autocommit)
+        handlers_includeme(config)
+        routehelper_includeme(config)
+        return config
+    
+    def setUp(self):
+        self.config = self._create_config()
+        self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages')
+        self.config.begin()
+        
+        self.wsgi_app = self.config.make_wsgi_app()
+
+        self.collection_path = '/messages'
+        self.collection_name = 'messages'
+        self.member_path     = '/messages/:id'
+        self.member_name     = 'message'
+    
+    def tearDown(self):
+        self.config.end()
+        del self.config
+    
+    def _get(self, path):
+        return self._makeRequest(path, 'GET')
+    
+    def _post(self, path):
+        return self._makeRequest(path, 'POST')
+    
+    def _put(self, path):
+        return self._makeRequest(path, 'PUT')
+    
+    def _delete(self, path):
+        return self._makeRequest(path, 'DELETE')
+    
+    def _makeRequest(self, path, request_method = 'GET'):
+        wsgi_environ = dict(
+            PATH_INFO = path,
+            REQUEST_METHOD = request_method
+        )
+        resp_body = self.wsgi_app(wsgi_environ, lambda status,headers: None)[0]
+        return resp_body
+    
+    def test_get_collection(self):
+        result = self._get('/messages')
+        assert result == '"index"'
+    
+    def test_post_collection(self):
+        result = self._post('/messages')
+        assert result == '"create"'
+    
+    def test_get_member(self):
+        result = self._get('/messages/1')
+        assert result == '"show"'
+    
+    def test_put_member(self):
+        result = self._put('/messages/1')
+        assert result == '"update"'
+    
+    def test_delete_member(self):
+        result = self._delete('/messages/1')
+        assert result == '"delete"'
+    
+    def test_new_member(self):
+        result = self._get('/messages/new')
+        assert result == '"new"'
+    
+    def test_edit_member(self):
+        result = self._get('/messages/1/edit')
+        assert result == '"edit"'
+
 class Test_includeme(unittest.TestCase):
     def test_includme(self):
         config = Configurator(autocommit=True)
