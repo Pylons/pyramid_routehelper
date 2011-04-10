@@ -1,16 +1,14 @@
 import unittest
 from pyramid import testing
-from pyramid_handlers import includeme as handlers_includeme, action
 from pyramid.config import Configurator
-from pyramid_routehelper import includeme as routehelper_includeme, add_resource
+from pyramid_routehelper import includeme, add_resource, action, ConfigurationError
 from pyramid.url import route_path
 
 
 class TestResourceGeneration_add_resource(unittest.TestCase):
     def _create_config(self, autocommit=True):
         config = Configurator(autocommit=autocommit)
-        handlers_includeme(config)
-        routehelper_includeme(config)
+        includeme(config)
         return config
     
     def setUp(self):
@@ -25,39 +23,39 @@ class TestResourceGeneration_add_resource(unittest.TestCase):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages')
         
         assert route_path('messages', testing.DummyRequest()) == '/messages'
-        assert route_path('formatted_messages', testing.DummyRequest(), format='html') == '/messages.html'
+        assert route_path('json_formatted_messages', testing.DummyRequest()) == '/messages.json'
         assert route_path('new_message', testing.DummyRequest()) == '/messages/new'
-        assert route_path('formatted_new_message', testing.DummyRequest(), format='html') == '/messages/new.html'
+        assert route_path('json_formatted_new_message', testing.DummyRequest()) == '/messages/new.json'
         
-        assert route_path('formatted_message', testing.DummyRequest(), id=1, format='html') == '/messages/1.html'
+        assert route_path('json_formatted_message', testing.DummyRequest(), id=1) == '/messages/1.json'
         assert route_path('message', testing.DummyRequest(), id=1) == '/messages/1'
-        assert route_path('formatted_edit_message', testing.DummyRequest(), id=1, format='html') == '/messages/1/edit.html'
+        assert route_path('json_formatted_edit_message', testing.DummyRequest(), id=1) == '/messages/1/edit.json'
         assert route_path('edit_message', testing.DummyRequest(), id=1) == '/messages/1/edit'
     
     def test_resources_with_path_prefix(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', path_prefix='/category/:category_id')
         
         assert route_path('messages', testing.DummyRequest(), category_id=2) == '/category/2/messages'
-        assert route_path('formatted_messages', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages.html'
+        assert route_path('json_formatted_messages', testing.DummyRequest(), category_id=2) == '/category/2/messages.json'
         assert route_path('new_message', testing.DummyRequest(), category_id=2) == '/category/2/messages/new'
-        assert route_path('formatted_new_message', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages/new.html'
+        assert route_path('json_formatted_new_message', testing.DummyRequest(), category_id=2) == '/category/2/messages/new.json'
         
-        assert route_path('formatted_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1.html'
+        assert route_path('json_formatted_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1.json'
         assert route_path('message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1'
-        assert route_path('formatted_edit_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1/edit.html'
+        assert route_path('json_formatted_edit_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1/edit.json'
         assert route_path('edit_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1/edit'
     
     def test_resources_with_path_prefix_with_trailing_slash(self):
         self.config.add_resource('pyramid_routehelper.tests:DummyCrudHandler', 'message', 'messages', path_prefix='/category/:category_id/')
         
         assert route_path('messages', testing.DummyRequest(), category_id=2) == '/category/2/messages'
-        assert route_path('formatted_messages', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages.html'
+        assert route_path('json_formatted_messages', testing.DummyRequest(), category_id=2) == '/category/2/messages.json'
         assert route_path('new_message', testing.DummyRequest(), category_id=2) == '/category/2/messages/new'
-        assert route_path('formatted_new_message', testing.DummyRequest(), format='html', category_id=2) == '/category/2/messages/new.html'
+        assert route_path('json_formatted_new_message', testing.DummyRequest(), category_id=2) == '/category/2/messages/new.json'
         
-        assert route_path('formatted_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1.html'
+        assert route_path('json_formatted_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1.json'
         assert route_path('message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1'
-        assert route_path('formatted_edit_message', testing.DummyRequest(), id=1, format='html', category_id=2) == '/category/2/messages/1/edit.html'
+        assert route_path('json_formatted_edit_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1/edit.json'
         assert route_path('edit_message', testing.DummyRequest(), id=1, category_id=2) == '/category/2/messages/1/edit'
     
     def test_resources_with_collection_action(self):
@@ -105,12 +103,23 @@ class TestResourceGeneration_add_resource(unittest.TestCase):
         
         assert route_path('messages', testing.DummyRequest(), category_id=2) == '/categories/2/messages'
         assert route_path('message', testing.DummyRequest(), category_id=2, id=1) == '/categories/2/messages/1'
+    
+    def test_resources_with_double_default_views(self):
+        class MessedUpHandler(object):
+            @action(renderer='json')
+            @action(renderer='template.mak')
+            def index(self):
+                return {}
+        
+        try:
+            self.config.add_resource(MessedUpHandler, 'message', 'messages')
+        except ConfigurationError, e:
+            assert str(e) == "Two methods have been decorated without specifying a format."
 
 class TestResourceRecognition(unittest.TestCase):
     def _create_config(self, autocommit=True):
         config = Configurator(autocommit=autocommit)
-        handlers_includeme(config)
-        routehelper_includeme(config)
+        includeme(config)
         return config
     
     def setUp(self):
@@ -153,6 +162,10 @@ class TestResourceRecognition(unittest.TestCase):
         result = self._get('/messages')
         assert result == '"index"'
     
+    def test_get_formatted_collection(self):
+        result = self._get('/messages.json')
+        assert result == '{"format": "json"}'
+    
     def test_post_collection(self):
         result = self._post('/messages')
         assert result == '"create"'
@@ -180,8 +193,7 @@ class TestResourceRecognition(unittest.TestCase):
 class Test_includeme(unittest.TestCase):
     def test_includme(self):
         config = Configurator(autocommit=True)
-        handlers_includeme(config)
-        routehelper_includeme(config)
+        includeme(config)
         assert config.add_resource.im_func.__docobj__ is add_resource
 
 class DummyCrudHandler(object):
@@ -192,10 +204,16 @@ class DummyCrudHandler(object):
     def index(self):
         return "index"
     
+    @action(alt_for='index', renderer='xml', xhr=True, format='xml')
+    @action(alt_for='index', renderer='json', format='json')
+    def api_index(self):
+        return {'format':'json'}
+    
     @action(renderer='json')
     def create(self):
         return "create"
     
+    @action(renderer='json', format='json')
     @action(renderer='json')
     def show(self):
         return "show"
@@ -208,10 +226,16 @@ class DummyCrudHandler(object):
     def delete(self):
         return "delete"
     
+    @action(renderer='json', format='json')
     @action(renderer='json')
     def new(self):
         return "new"
     
+    @action(renderer='json', format='json')
     @action(renderer='json')
     def edit(self):
         return "edit"
+    
+    @action(renderer='json')
+    def sorted(self):
+        return "sorted"

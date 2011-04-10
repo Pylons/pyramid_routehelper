@@ -1,14 +1,10 @@
-from pyramid_handlers import add_handler
 from pyramid.config import ConfigurationError
+import inspect
 
-__all__ = ['includeme', 'add_resource']
+__all__ = ['includeme', 'add_resource', 'action']
 
 def includeme(config):
-    if getattr(config, 'add_handler', None):
-        config.add_directive('add_resource', add_resource)
-    else:
-        raise ConfigurationError("add_handler needs to be added before add_resource can be used")
-    
+    config.add_directive('add_resource', add_resource)
 
 def strip_slashes(name):
     """Remove slashes from the beginning and end of a part/URL."""
@@ -17,6 +13,31 @@ def strip_slashes(name):
     if name.endswith('/'):
         name = name[:-1]
     return name
+
+class action(object):
+    """Decorate a method for registration by 
+    :func:`~pyramid_routehelper.add_resource`.
+    
+    Keyword arguments are identical to :class:`~pyramid.view.view_config`, with
+    the exception to how the ``name`` argument is used.
+    
+    ``alt_for``
+        Designate a method as another view for the specified action if
+        the decorated method is not the desired action name instead of registering
+        the method with an action of the same name.
+    
+    ``format``
+        Specify a format for the view that this decorator describes.
+    """
+    def __init__(self, **kw):
+        self.kw = kw
+
+    def __call__(self, wrapped):
+        if hasattr(wrapped, '__exposed__'):
+            wrapped.__exposed__.append(self.kw)
+        else:
+            wrapped.__exposed__ = [self.kw]
+        return wrapped
 
 # map.resource port
 def add_resource(self, handler, member_name, collection_name, **kwargs):
@@ -145,7 +166,26 @@ def add_resource(self, handler, member_name, collection_name, **kwargs):
             >>> route_path('locations', region_id=51)
             '/regions/51/locations'
     """
+    handler = self.maybe_dotted(handler)
     
+    action_kwargs = {}
+    for name,meth in inspect.getmembers(handler, inspect.ismethod):
+        if hasattr(meth, '__exposed__'):
+            for settings in meth.__exposed__:
+                config_settings = settings.copy()
+                action_name = config_settings.pop('alt_for', name)
+
+                # If format is not set, use the route that doesn't specify a format
+                if 'format' not in config_settings:
+                    if 'default' in action_kwargs.get(action_name,{}):
+                        raise ConfigurationError("Two methods have been decorated without specifying a format.")
+                    else:
+                        action_kwargs.setdefault(action_name, {})['default'] = config_settings
+                # Otherwise, append to the list of view config settings for formatted views
+                else:
+                    config_settings['attr'] = name
+                    action_kwargs.setdefault(action_name, {}).setdefault('formatted',[]).append(config_settings)
+                
     collection = kwargs.pop('collection', {})
     member = kwargs.pop('member', {})
     new = kwargs.pop('new', {})
@@ -188,86 +228,55 @@ def add_resource(self, handler, member_name, collection_name, **kwargs):
     collection_path = path
     new_path = path + '/new'
     member_path = path + '/:id'
-    
-    options = dict(
-        handler = handler
-    )
-    
-    def requirements_for(meth):
-        opts = options.copy()
-        if method != 'any':
-            opts['request_method'] = meth.upper()
-        return opts
+
+    def add_route_and_view(self, action, route_name, path, request_method='any'):
+        if request_method != 'any':
+            request_method = request_method.upper()
+        else:
+            request_method = None
+        
+        self.add_route(route_name, path, **kwargs)
+        self.add_view(view=handler, attr=action, route_name=route_name, request_method=request_method, **action_kwargs.get(action, {}).get('default', {}))
+        
+        for format_kwargs in action_kwargs.get(action, {}).get('formatted', []):
+            format = format_kwargs.pop('format')
+            self.add_route("%s_formatted_%s" % (format, route_name),
+                           "%s.%s" % (path, format), **kwargs)
+            self.add_view(view=handler, attr=format_kwargs.pop('attr'), request_method=request_method,
+                          route_name = "%s_formatted_%s" % (format, route_name), **format_kwargs)
     
     for method, lst in collection_methods.iteritems():
         primary = (method != 'GET' and lst.pop(0)) or None
-        route_options = requirements_for(method)
         for action in lst:
-            route_options['action'] = action
-            route_name = "%s%s_%s" % (name_prefix, action, collection_name)
-
-            # Connect paths
-            self.add_handler("formatted_" + route_name,
-                             "%s/%s.:format" % (collection_path, action),
-                             **route_options)
-            self.add_handler(route_name,
-                             "%s/%s" % (collection_path, action),
-                             **route_options)
+            add_route_and_view(self, action, "%s%s_%s" % (name_prefix, action, collection_name), "%s/%s" % (collection_path,action))
         
         if primary:
-            route_options['action'] = primary
-            self.add_handler("formatted_%s" % collection_name, "%s.:format" % collection_path, **route_options)
-            self.add_handler(collection_name, collection_path, **route_options)
-        
-    self.add_handler("formatted_" + name_prefix + collection_name,
-                     collection_path + ".:format",
-                     handler,
-                     action='index',
-                     request_method='GET')
-    self.add_handler(name_prefix + collection_name,
-                     collection_path,
-                     handler,
-                     action='index',
-                     request_method='GET')
+            add_route_and_view(self, primary, name_prefix + collection_name, collection_path, method)
+    
+    # Add route and view for collection
+    add_route_and_view(self, 'index', name_prefix + collection_name, collection_path, 'GET')
     
     for method, lst in new_methods.iteritems():
-        route_options = requirements_for(method)
         for action in lst:
             path = (action == 'new' and new_path) or "%s/%s" % (new_path, action)
             name = "new_" + member_name
             if action != 'new':
                 name = action + "_" + name
-            route_options['action'] = action
             formatted_path = (action == 'new' and new_path + '.:format') or "%s/%s.:format" % (new_path, action)
-            self.add_handler('formatted_' + name_prefix + name, formatted_path, **route_options)
-            self.add_handler(name_prefix + name, path, **route_options)
-    
-    requirements_regexp = '[^\/]+'
+            add_route_and_view(self, action, name_prefix + name, path, method)
     
     for method, lst in member_methods.iteritems():
-        route_options = requirements_for(method)
         if method not in ['POST', 'GET', 'any']:
             primary = lst.pop(0)
         else:
             primary = None
         for action in lst:
-            route_options['action'] = action
-            self.add_handler('formatted_%s%s_%s' % (name_prefix, action, member_name),
-                             '%s/%s.:format' % (member_path, action), **route_options)
-            self.add_handler('%s%s_%s' % (name_prefix, action, member_name),
-                             '%s/%s' % (member_path, action), **route_options)
+            add_route_and_view(self, action, '%s%s_%s' % (name_prefix, action, member_name), '%s/%s' % (member_path, action))
         
         if primary:
-            route_options['action'] = primary
-            self.add_handler("formatted_" + member_name,
-                             "%s.:format"  % member_path, **route_options)
-            self.add_handler(member_name, member_path, **route_options)
+            add_route_and_view(self, primary, name_prefix + member_name, member_path, method)
     
-    route_options = requirements_for('GET')
-    route_options['action'] = 'show'
-    self.add_handler('formatted_' + name_prefix + member_name,
-                     member_path + ".:format", **route_options)
-    self.add_handler(name_prefix + member_name, member_path, **route_options)
+    add_route_and_view(self, 'show', name_prefix + member_name, member_path, method)
 
 # Submapper support
 
