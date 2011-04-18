@@ -160,7 +160,7 @@ class TestResourceRecognition(unittest.TestCase):
     
     def test_get_collection(self):
         result = self._get('/messages')
-        assert result == '"index"'
+        assert result == 'index'
     
     def test_get_formatted_collection(self):
         result = self._get('/messages.json')
@@ -168,27 +168,27 @@ class TestResourceRecognition(unittest.TestCase):
     
     def test_post_collection(self):
         result = self._post('/messages')
-        assert result == '"create"'
+        assert result == 'create'
     
     def test_get_member(self):
         result = self._get('/messages/1')
-        assert result == '"show"'
+        assert result == 'show'
     
     def test_put_member(self):
         result = self._put('/messages/1')
-        assert result == '"update"'
+        assert result == 'update'
     
     def test_delete_member(self):
         result = self._delete('/messages/1')
-        assert result == '"delete"'
+        assert result == 'delete'
     
     def test_new_member(self):
         result = self._get('/messages/new')
-        assert result == '"new"'
+        assert result == 'new'
     
     def test_edit_member(self):
         result = self._get('/messages/1/edit')
-        assert result == '"edit"'
+        assert result == 'edit'
 
 class Test_includeme(unittest.TestCase):
     def test_includme(self):
@@ -200,7 +200,7 @@ class DummyCrudHandler(object):
     def __init__(self, request):
         self.request = request
     
-    @action(renderer='json')
+    @action(renderer='string')
     def index(self):
         return "index"
     
@@ -209,33 +209,33 @@ class DummyCrudHandler(object):
     def api_index(self):
         return {'format':'json'}
     
-    @action(renderer='json')
+    @action(renderer='string')
     def create(self):
         return "create"
     
     @action(renderer='json', format='json')
-    @action(renderer='json')
+    @action(renderer='string')
     def show(self):
         return "show"
     
-    @action(renderer='json')
+    @action(renderer='string')
     def update(self):
         return "update"
     
-    @action(renderer='json')
+    @action(renderer='string')
     def delete(self):
         return "delete"
     
     @action(renderer='json', format='json')
-    @action(renderer='json')
+    @action(renderer='string')
     def new(self):
         return "new"
     
     @action(renderer='json', format='json')
-    @action(renderer='json')
+    @action(renderer='string')
     def edit(self):
         return "edit"
     
-    @action(renderer='json')
+    @action(renderer='string')
     def sorted(self):
         return "sorted"
