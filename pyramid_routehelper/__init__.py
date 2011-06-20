@@ -228,6 +228,13 @@ def add_resource(self, handler, member_name, collection_name, **kwargs):
     collection_path = path
     new_path = path + '/new'
     member_path = path + '/:id'
+    
+    added_route_names = {}
+    
+    def add_route_if_new(self, route_name, path, **kwargs):
+        if route_name not in added_route_names:
+            self.add_route(route_name, path, **kwargs)
+            added_route_names[route_name] = path
 
     def add_route_and_view(self, action, route_name, path, request_method='any'):
         if request_method != 'any':
@@ -235,13 +242,14 @@ def add_resource(self, handler, member_name, collection_name, **kwargs):
         else:
             request_method = None
         
-        self.add_route(route_name, path, **kwargs)
+        add_route_if_new(self, route_name, path, **kwargs)
         self.add_view(view=handler, attr=action, route_name=route_name, request_method=request_method, **action_kwargs.get(action, {}).get('default', {}))
         
         for format_kwargs in action_kwargs.get(action, {}).get('formatted', []):
             format = format_kwargs.pop('format')
-            self.add_route("%s_formatted_%s" % (format, route_name),
-                           "%s.%s" % (path, format), **kwargs)
+            formatted_route_name = "%s_formatted_%s" % (format, route_name)
+            
+            add_route_if_new(self, formatted_route_name, "%s.%s" % (path, format), **kwargs)
             self.add_view(view=handler, attr=format_kwargs.pop('attr'), request_method=request_method,
                           route_name = "%s_formatted_%s" % (format, route_name), **format_kwargs)
     
